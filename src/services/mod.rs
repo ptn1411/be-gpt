@@ -1,0 +1,20 @@
+pub mod auth;
+pub mod bot;
+pub mod bot_engine;
+pub mod chat;
+pub mod invite_link;
+pub mod login_rate_limiter;
+pub mod message;
+pub mod settings;
+pub mod user;
+pub mod websocket;
+
+pub use auth::AuthService;
+pub use bot::BotService;
+pub use bot_engine::{MessageProcessor, ParsedCommand};
+pub use chat::ChatService;
+pub use login_rate_limiter::LoginRateLimiter;
+pub use message::MessageService;
+pub use settings::SettingsService;
+pub use user::UserService;
+pub use websocket::WebSocketService;
