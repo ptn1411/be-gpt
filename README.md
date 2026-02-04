@@ -104,6 +104,23 @@ cargo test
 cargo clippy
 ```
 
+## CI/CD
+
+Pushes to `main` trigger `.github/workflows/deploy.yml`:
+
+1. **Build job** – checks out the repo, installs the stable Rust toolchain, caches Cargo artifacts, then runs `cargo build --release` and `cargo test --release`. The resulting `chat-backend` binary is uploaded as a GitHub Actions artifact.
+2. **Deploy job** – downloads the artifact, opens an SSH session using `SSH_PRIVATE_KEY`, and `rsync`s the binary plus the `migrations/` folder to `${DEPLOY_PATH}` on the server. If an `ENV_FILE` secret is supplied, it writes it to `${DEPLOY_PATH}/.env`. Finally it runs `./chat-backend migrate || true` (adjust to your migration command if needed) and restarts `chat-backend.service` via `systemctl`.
+
+### Required GitHub Secrets
+
+- `SSH_PRIVATE_KEY` – private key with access to the deploy target.
+- `DEPLOY_USER` – SSH user account.
+- `DEPLOY_HOST` – server host (domain or IP).
+- `DEPLOY_PATH` – absolute path where the binary should live (must be writable and readable by the systemd unit).
+- `ENV_FILE` *(optional)* – full contents of the `.env` file; leave empty to keep the remote `.env` untouched.
+
+Make sure the remote host has `rsync`, `systemctl`, and any migration tooling available, and that the deployed binary exposes a `migrate` subcommand (or update the workflow to call your own migration runner).
+
 ## License
 
 MIT
