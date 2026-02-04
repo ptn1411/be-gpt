@@ -65,10 +65,12 @@ jobs:
             ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_PATH }}/
 
       - name: Upload environment file (optional)
-        if: secrets.ENV_FILE != ''
+        env:
+          ENV_FILE: ${{ secrets.ENV_FILE }}
+        if: ${{ env.ENV_FILE != '' }}
         run: |
           ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "cat <<'EOF' > ${{ secrets.DEPLOY_PATH }}/.env
-          ${{ secrets.ENV_FILE }}
+          $ENV_FILE
           EOF"
 
       - name: Restart service
