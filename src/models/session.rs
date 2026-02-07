@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::FromRow;
+use sqlx::{types::ipnetwork::IpNetwork, FromRow};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -13,7 +13,7 @@ pub struct Session {
     pub device_name: Option<String>,
     pub device_type: Option<String>,
     pub location: Option<String>,
-    pub ip_address: Option<String>,
+    pub ip_address: Option<IpNetwork>,
     pub expires_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
     pub last_active: DateTime<Utc>,
