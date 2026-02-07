@@ -1,82 +1,78 @@
-name: Build & Deploy
+name: Deploy
 
 on:
+  workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, master]
+    paths:
+      - "src/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "deploy.sh"
+      - "deploy/**"
+      - "public/**"
+      - ".github/workflows/deploy.yml"
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
+        uses: dtolnay/rust-toolchain@stable
 
-      - name: Cache cargo artifacts
+      - name: Cache cargo
         uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
+          key: deploy-${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            deploy-${{ runner.os }}-cargo-
 
-      - name: Build
+      - name: Build release binary
         run: cargo build --release
 
-      - name: Test
-        run: cargo test --release
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: chat-backend
-          path: target/release/chat-backend
-
-  deploy:
-    needs: build
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: chat-backend
-
-      - name: Start SSH agent
-        uses: webfactory/ssh-agent@v0.8.0
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
-      - name: Upload binary and migrations
+      - name: Package deploy bundle
         run: |
-          rsync -avz \
-            chat-backend \
-            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_PATH }}/chat-backend
-          rsync -avz migrations \
-            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_PATH }}/
+          mkdir -p dist
+          cp target/release/chat-backend dist/
+          cp deploy.sh dist/
+          tar -czf chat-backend.tar.gz -C dist .
 
-      - name: Upload environment file (optional)
-        env:
-          ENV_FILE: ${{ secrets.ENV_FILE }}
-        if: ${{ env.ENV_FILE != '' }}
-        run: |
-          ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "cat <<'EOF' > ${{ secrets.DEPLOY_PATH }}/.env
-          $ENV_FILE
-          EOF"
+      - name: Copy bundle to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          source: chat-backend.tar.gz
+          target: /tmp
 
-      - name: Restart service
-        run: |
-          ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "\
-            cd ${{ secrets.DEPLOY_PATH }} && \
-            ./chat-backend migrate || true && \
-            sudo systemctl restart chat-backend.service \
-          "
+      - name: Run remote deploy
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          script: |
+            set -euo pipefail
+            WORK_DIR=/tmp/chat-backend-deploy
+            mkdir -p "$WORK_DIR"
+            tar -xzf /tmp/chat-backend.tar.gz -C "$WORK_DIR"
+            cd "$WORK_DIR"
+            chmod +x deploy.sh
+            BIN_PATH=./chat-backend ./deploy.sh
+            rm -f /tmp/chat-backend.tar.gz

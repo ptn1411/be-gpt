@@ -11,12 +11,27 @@ mod integration_tests {
 
     // Helper function to create a test database connection
     async fn setup_test_db() -> Database {
-        let database_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://postgres:postgres@localhost/chat_test".to_string());
+        // Load local .env when tests are launched directly via `cargo test`
+        dotenvy::dotenv().ok();
 
-        let pool = PgPool::connect(&database_url)
-            .await
-            .expect("Failed to connect to test database");
+        let (database_url, source) = std::env::var("TEST_DATABASE_URL")
+            .map(|url| (url, "TEST_DATABASE_URL"))
+            .or_else(|_| {
+                std::env::var("DATABASE_URL").map(|url| (url, "DATABASE_URL"))
+            })
+            .unwrap_or_else(|_| {
+                (
+                    "postgres://postgres:postgres@localhost/chat_test".to_string(),
+                    "built-in default",
+                )
+            });
+
+        let pool = PgPool::connect(&database_url).await.unwrap_or_else(|err| {
+            panic!(
+                "Failed to connect to test database via {}: {}",
+                source, err
+            )
+        });
 
         Database { pool }
     }
