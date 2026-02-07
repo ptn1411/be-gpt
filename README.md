@@ -20,11 +20,13 @@ Backend API cho ứng dụng Chat, được xây dựng bằng Rust với Axum f
 ## Setup
 
 1. Clone repository và cd vào thư mục backend:
+
 ```bash
 cd backend
 ```
 
 2. Copy file environment:
+
 ```bash
 cp .env.example .env
 ```
@@ -32,19 +34,32 @@ cp .env.example .env
 3. Cập nhật `.env` với thông tin database của bạn.
 
 4. Tạo database:
+
 ```bash
 createdb chat_db
 ```
 
 5. Chạy migrations:
+
 ```bash
 cargo install sqlx-cli
 sqlx migrate run
+./chat-backend migrate
 ```
 
 6. Chạy server:
+
 ```bash
 cargo run
+
+mkdir -p certs        # create folder if it’s missing
+openssl genrsa -out certs/server.key 2048
+openssl req -new -key certs/server.key -out certs/server.csr \
+  -subj "/CN=localhost"
+openssl x509 -req -in certs/server.csr -signkey certs/server.key \
+  -out certs/server.crt -days 365 -sha256
+
+scp -r migrations root@ip:/opt/chat-backend/
 ```
 
 Server sẽ chạy tại `http://localhost:3000`
@@ -52,22 +67,26 @@ Server sẽ chạy tại `http://localhost:3000`
 ## API Endpoints
 
 ### Authentication
+
 - `POST /api/v1/auth/register` - Đăng ký
 - `POST /api/v1/auth/login` - Đăng nhập
 - `POST /api/v1/auth/logout` - Đăng xuất
 - `GET /api/v1/auth/session` - Lấy session hiện tại
 
 ### Users
+
 - `GET /api/v1/users` - Lấy danh sách users
 - `GET /api/v1/users/:id` - Lấy thông tin user
 
 ### Chats
+
 - `GET /api/v1/chats` - Lấy danh sách chats
 - `GET /api/v1/chats/:id` - Lấy chi tiết chat
 - `POST /api/v1/chats/group` - Tạo group chat
 - `POST /api/v1/chats/:id/read` - Đánh dấu đã đọc
 
 ### Messages
+
 - `GET /api/v1/chats/:chatId/messages` - Lấy messages
 - `POST /api/v1/chats/:chatId/messages` - Gửi message
 - `PUT /api/v1/chats/:chatId/messages/:id` - Sửa message
@@ -77,6 +96,7 @@ Server sẽ chạy tại `http://localhost:3000`
 - `DELETE /api/v1/chats/:chatId/messages/:id/pin` - Unpin message
 
 ### Settings
+
 - `GET/PUT /api/v1/settings/profile` - Profile settings
 - `GET/PUT /api/v1/settings/privacy` - Privacy settings
 - `GET/PUT /api/v1/settings/notifications` - Notification settings
@@ -89,6 +109,7 @@ Server sẽ chạy tại `http://localhost:3000`
 - `DELETE /api/v1/settings/devices` - Terminate all other devices
 
 ### Upload
+
 - `POST /api/v1/upload` - Upload file
 
 ## Development
@@ -117,10 +138,23 @@ Pushes to `main` trigger `.github/workflows/deploy.yml`:
 - `DEPLOY_USER` – SSH user account.
 - `DEPLOY_HOST` – server host (domain or IP).
 - `DEPLOY_PATH` – absolute path where the binary should live (must be writable and readable by the systemd unit).
-- `ENV_FILE` *(optional)* – full contents of the `.env` file; leave empty to keep the remote `.env` untouched.
+- `ENV_FILE` _(optional)_ – full contents of the `.env` file; leave empty to keep the remote `.env` untouched.
 
 Make sure the remote host has `rsync`, `systemctl`, and any migration tooling available, and that the deployed binary exposes a `migrate` subcommand (or update the workflow to call your own migration runner).
 
 ## License
 
+MIT
+
+- `SSH_PRIVATE_KEY` – private key with access to the deploy target.
+- `DEPLOY_USER` – SSH user account.
+- `DEPLOY_HOST` – server host (domain or IP).
+- `DEPLOY_PATH` – absolute path where the binary should live (must be writable and readable by the systemd unit).
+- `ENV_FILE` _(optional)_ – full contents of the `.env` file; leave empty to keep the remote `.env` untouched.
+
+Make sure the remote host has `rsync`, `systemctl`, and any migration tooling available, and that the deployed binary exposes a `migrate` subcommand (or update the workflow to call your own migration runner).
+
+## License
+
+MIT
 MIT
