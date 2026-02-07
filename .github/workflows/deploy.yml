@@ -48,6 +48,7 @@ jobs:
           mkdir -p dist
           cp target/release/chat-backend dist/
           cp deploy.sh dist/
+          cp -r migrations dist/
           tar -czf chat-backend.tar.gz -C dist .
 
       - name: Copy bundle to server
